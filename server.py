@@ -239,7 +239,7 @@ class AppHandler(SimpleHTTPRequestHandler):
             client = crawler.GitHubClient(token=token)
             try:
                 # Lấy username từ token
-                user_info = client.request("/user")
+                user_info = client.request("/user", description="👤 User Profile: Xác thực và lấy thông tin user đang đăng nhập")
                 username = user_info.get("login")
             except Exception as e:
                 self._send_json(401, {"error": "invalid_token", "message": f"Không thể xác thực user: {e}"})
@@ -262,10 +262,15 @@ class AppHandler(SimpleHTTPRequestHandler):
                     "success": True,
                     "mode_used": chosen_mode,
                     "data": result,
-                    "markdown": md_report
+                    "markdown": md_report,
+                    "network_logs": client.network_logs
                 })
             except Exception as e:
-                self._send_json(500, {"error": "crawler_error", "message": str(e)})
+                self._send_json(500, {
+                    "error": "crawler_error",
+                    "message": str(e),
+                    "network_logs": client.network_logs
+                })
             return
 
         # 6. Mặc định: Phục vụ Static Files trong thư mục public/

@@ -17,6 +17,7 @@ Hỗ trợ 3 chế độ:
 import sys
 import os
 import json
+import time
 import argparse
 import urllib.request
 import urllib.error
@@ -30,6 +31,7 @@ class GitHubClient:
     def __init__(self, token: Optional[str] = None):
         self.token = token or os.environ.get("GITHUB_TOKEN")
         self.base_url = "https://api.github.com"
+        self.network_logs = []  # Lưu toàn bộ lịch sử gọi API và raw data
 
     def _get_headers(self) -> Dict[str, str]:
         headers = {
@@ -41,24 +43,88 @@ class GitHubClient:
             headers["Authorization"] = f"Bearer {self.token}"
         return headers
 
-    def request(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    def request(self, endpoint: str, params: Optional[Dict[str, Any]] = None, description: str = "") -> Any:
         url = f"{self.base_url}{endpoint}"
         if params:
             encoded_params = urllib.parse.urlencode(params)
             url = f"{url}?{encoded_params}"
 
         req = urllib.request.Request(url, headers=self._get_headers())
+        start_time = time.time()
+        call_time_str = datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
         try:
             with urllib.request.urlopen(req) as resp:
-                data = resp.read().decode("utf-8")
-                return json.loads(data)
+                status_code = resp.status
+                duration_ms = round((time.time() - start_time) * 1000, 2)
+                raw_body = resp.read().decode("utf-8")
+                parsed_json = json.loads(raw_body)
+
+                # Thu thập thông tin rate limit từ response headers
+                rate_limit_remaining = resp.headers.get("x-ratelimit-remaining")
+                rate_limit_limit = resp.headers.get("x-ratelimit-limit")
+                rate_limit_used = resp.headers.get("x-ratelimit-used")
+                rate_limit_reset = resp.headers.get("x-ratelimit-reset")
+
+                item_count = 0
+                if isinstance(parsed_json, list):
+                    item_count = len(parsed_json)
+                elif isinstance(parsed_json, dict):
+                    if "items" in parsed_json:
+                        item_count = len(parsed_json.get("items", []))
+                    elif "total_count" in parsed_json:
+                        item_count = parsed_json.get("total_count", 0)
+                    else:
+                        item_count = len(parsed_json.keys())
+
+                log_entry = {
+                    "id": len(self.network_logs) + 1,
+                    "time": call_time_str,
+                    "method": "GET",
+                    "endpoint": endpoint,
+                    "full_url": url,
+                    "description": description or f"GET {endpoint}",
+                    "status_code": status_code,
+                    "duration_ms": duration_ms,
+                    "rate_limit_remaining": rate_limit_remaining,
+                    "rate_limit_limit": rate_limit_limit,
+                    "rate_limit_used": rate_limit_used,
+                    "rate_limit_reset": rate_limit_reset,
+                    "item_count": item_count,
+                    "response_size_kb": round(len(raw_body) / 1024, 2),
+                    "raw_response": parsed_json,
+                    "error": False
+                }
+                self.network_logs.append(log_entry)
+                return parsed_json
+
         except urllib.error.HTTPError as e:
+            duration_ms = round((time.time() - start_time) * 1000, 2)
             error_body = e.read().decode("utf-8")
             try:
                 error_json = json.loads(error_body)
                 msg = error_json.get("message", error_body)
             except Exception:
+                error_json = {"raw_error": error_body}
                 msg = error_body
+
+            log_entry = {
+                "id": len(self.network_logs) + 1,
+                "time": call_time_str,
+                "method": "GET",
+                "endpoint": endpoint,
+                "full_url": url,
+                "description": description or f"GET {endpoint} (Lỗi {e.code})",
+                "status_code": e.code,
+                "duration_ms": duration_ms,
+                "rate_limit_remaining": e.headers.get("x-ratelimit-remaining") if hasattr(e, "headers") else None,
+                "rate_limit_limit": e.headers.get("x-ratelimit-limit") if hasattr(e, "headers") else None,
+                "raw_response": error_json,
+                "error": True,
+                "error_message": msg
+            }
+            self.network_logs.append(log_entry)
+
             if e.code == 403 and "rate limit" in msg.lower():
                 print(f"[!] Lỗi Rate Limit từ GitHub API: {msg}", file=sys.stderr)
                 print("[!] Gợi ý: Hãy truyền GitHub Token (--token <TOKEN> hoặc set biến môi trường GITHUB_TOKEN) để có hạn mức 5,000 req/giờ.", file=sys.stderr)
@@ -102,7 +168,7 @@ def crawl_user_events_by_date(client: GitHubClient, username: str, target_date: 
     # GitHub Events API cho phép tối đa 300 events (3 trang x 100)
     for page in range(1, 4):
         try:
-            events = client.request(f"/users/{username}/events", {"per_page": 100, "page": page})
+            events = client.request(f"/users/{username}/events", {"per_page": 100, "page": page}, description=f"📡 Activity Events API: Lấy timeline sự kiện của @{username} (Trang {page}/3)")
             if not events or not isinstance(events, list):
                 break
             all_events.extend(events)
@@ -169,7 +235,7 @@ def crawl_user_events_by_date(client: GitHubClient, username: str, target_date: 
                 # Nếu API không trả về mảng commits (để tiết kiệm băng thông), thử lấy thông điệp qua SHA
                 commit_msg = ""
                 try:
-                    commit_detail = client.request(f"/repos/{repo_name}/commits/{head_sha}")
+                    commit_detail = client.request(f"/repos/{repo_name}/commits/{head_sha}", description=f"🔎 Commit Detail: Lấy message commit {head_sha[:7]} từ {repo_name}")
                     commit_msg = commit_detail.get("commit", {}).get("message", "").split("\n")[0]
                 except Exception:
                     pass
@@ -310,7 +376,7 @@ def crawl_user_activity_via_search(client: GitHubClient, username: str, target_d
     # 1. Tìm PRs được tạo ngày hôm đó: author:USER type:pr created:YYYY-MM-DD
     try:
         q_prs = f"author:{username} type:pr created:{date_str}"
-        res_prs = client.request("/search/issues", {"q": q_prs, "per_page": 100})
+        res_prs = client.request("/search/issues", {"q": q_prs, "per_page": 100}, description=f"🔍 Search PRs: Tìm Pull Requests tạo bởi @{username} ngày {date_str}")
         for item in res_prs.get("items", []):
             categorized["prs_created"].append({
                 "title": item.get("title"),
@@ -325,7 +391,7 @@ def crawl_user_activity_via_search(client: GitHubClient, username: str, target_d
     # 2. Tìm Issues được tạo ngày hôm đó: author:USER type:issue created:YYYY-MM-DD
     try:
         q_issues = f"author:{username} type:issue created:{date_str}"
-        res_issues = client.request("/search/issues", {"q": q_issues, "per_page": 100})
+        res_issues = client.request("/search/issues", {"q": q_issues, "per_page": 100}, description=f"🔍 Search Issues: Tìm Issues tạo bởi @{username} ngày {date_str}")
         for item in res_issues.get("items", []):
             categorized["issues_created"].append({
                 "title": item.get("title"),
@@ -340,7 +406,7 @@ def crawl_user_activity_via_search(client: GitHubClient, username: str, target_d
     # 3. Tìm PRs được review bởi user vào ngày đó: reviewed-by:USER type:pr updated:YYYY-MM-DD
     try:
         q_review = f"reviewed-by:{username} type:pr updated:{date_str}"
-        res_reviews = client.request("/search/issues", {"q": q_review, "per_page": 50})
+        res_reviews = client.request("/search/issues", {"q": q_review, "per_page": 50}, description=f"🔍 Search Reviews: Tìm PRs được @{username} review ngày {date_str}")
         for item in res_reviews.get("items", []):
             categorized["prs_reviewed"].append({
                 "title": item.get("title"),
@@ -355,7 +421,7 @@ def crawl_user_activity_via_search(client: GitHubClient, username: str, target_d
     # 4. Tìm các Issue/PR có user bình luận vào ngày đó: commenter:USER updated:YYYY-MM-DD
     try:
         q_comment = f"commenter:{username} updated:{date_str}"
-        res_comments = client.request("/search/issues", {"q": q_comment, "per_page": 50})
+        res_comments = client.request("/search/issues", {"q": q_comment, "per_page": 50}, description=f"🔍 Search Comments: Tìm Issue/PR có @{username} bình luận ngày {date_str}")
         for item in res_comments.get("items", []):
             is_pr = "pull_request" in item
             categorized["items_commented"].append({
@@ -371,7 +437,7 @@ def crawl_user_activity_via_search(client: GitHubClient, username: str, target_d
     # 5. Tìm Commits được commit ngày hôm đó: author:USER author-date:YYYY-MM-DD
     try:
         q_commits = f"author:{username} author-date:{date_str}"
-        res_commits = client.request("/search/commits", {"q": q_commits, "per_page": 100})
+        res_commits = client.request("/search/commits", {"q": q_commits, "per_page": 100}, description=f"🔍 Search Commits: Tìm commits của @{username} ngày {date_str}")
         for item in res_commits.get("items", []):
             commit_data = item.get("commit", {})
             repo_info = item.get("repository", {})
