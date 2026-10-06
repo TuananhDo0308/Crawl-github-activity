@@ -1,0 +1,21 @@
+{
+  "method": "search_api",
+  "username": "TuananhDo0308",
+  "date": "2026-10-06",
+  "total_results": 1,
+  "categorized": {
+    "commits": [],
+    "prs_created": [],
+    "issues_created": [
+      {
+        "title": "Test",
+        "url": "https://github.com/TuananhDo0308/NaPasta/issues/1",
+        "state": "open",
+        "repo": "TuananhDo0308/NaPasta",
+        "created_at": "2026-10-06T15:53:47Z"
+      }
+    ],
+    "prs_reviewed": [],
+    "items_commented": []
+  }
+}

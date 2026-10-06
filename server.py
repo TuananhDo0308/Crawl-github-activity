@@ -245,13 +245,22 @@ class AppHandler(SimpleHTTPRequestHandler):
                 self._send_json(401, {"error": "invalid_token", "message": f"Không thể xác thực user: {e}"})
                 return
 
+            # Chọn mode
+            days_ago = (datetime.now().date() - target_date).days
+            chosen_mode = mode
+            if chosen_mode == "auto":
+                chosen_mode = "events" if 0 <= days_ago <= 30 else "search"
+
             try:
-                # Chỉ sử dụng GitHub REST Search API
-                result = crawler.crawl_user_activity_via_search(client, username, target_date)
+                if chosen_mode == "events":
+                    result = crawler.crawl_user_events_by_date(client, username, target_date, tz_offset_hours=tz_offset)
+                else:
+                    result = crawler.crawl_user_activity_via_search(client, username, target_date)
+
                 md_report = crawler.generate_markdown_report(result)
                 self._send_json(200, {
                     "success": True,
-                    "mode_used": "search",
+                    "mode_used": chosen_mode,
                     "data": result,
                     "markdown": md_report
                 })

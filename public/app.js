@@ -328,13 +328,16 @@ async function crawlActivity() {
     return;
   }
 
+  const tzVal = selectTz.value;
+  const modeVal = selectMode.value;
+
   btnCrawl.disabled = true;
-  btnCrawlText.textContent = "Đang Tìm Kiếm...";
+  btnCrawlText.textContent = "Đang Crawl...";
   loadingSpinner.classList.remove("hidden");
   resultsContainer.classList.add("hidden");
 
   try {
-    const res = await fetch(`/api/activity?date=${dateVal}`);
+    const res = await fetch(`/api/activity?date=${dateVal}&tz=${tzVal}&mode=${modeVal}`);
     const jsonRes = await res.json();
 
     if (!res.ok || !jsonRes.success) {
@@ -346,43 +349,65 @@ async function crawlActivity() {
     currentMarkdown = jsonRes.markdown;
 
     // Cập nhật kết quả lên UI
-    updateResultsUI();
-    showToast(`✅ Đã tìm thấy dữ liệu hoạt động ngày ${dateVal}!`);
+    updateResultsUI(jsonRes.mode_used);
+    showToast(`✅ Đã tải dữ liệu hoạt động ngày ${dateVal}!`);
   } catch (err) {
     showToast("❌ Lỗi mạng hoặc server khi crawl dữ liệu.");
   } finally {
     btnCrawl.disabled = false;
-    btnCrawlText.textContent = "Tìm Kiếm Hoạt Động";
+    btnCrawlText.textContent = "Thu Thập Dữ Liệu";
     loadingSpinner.classList.add("hidden");
   }
 }
 
-function updateResultsUI() {
+function updateResultsUI(modeUsed) {
   resultsContainer.classList.remove("hidden");
   resultsHeadline.textContent = `Hoạt Động Ngày: ${inputDate.value}`;
-  resultsMetaBadge.textContent = "GitHub REST Search API";
+  
+  const modeText = modeUsed === "events" 
+    ? "⚡ Activity Events API (Dòng thời gian đầy đủ)" 
+    : "🔍 REST Search API (Truy vấn lịch sử)";
+  resultsMetaBadge.textContent = `Phương thức: ${modeText}`;
 
   const cat = currentActivityData.categorized || {};
 
-  const countCommits = (cat.commits || []).length;
-  const countPrs = (cat.prs_created || []).length;
-  const countIssues = (cat.issues_created || []).length;
-  const countReviews = (cat.prs_reviewed || []).length;
-  const countComments = (cat.items_commented || []).length;
+  // Cập nhật các con số thống kê
+  let countCommits = 0;
+  let countPrs = 0;
+  let countIssues = 0;
+  let countReviews = 0;
+  let countComments = 0;
+  let countOthers = 0;
+
+  if (currentActivityData.method === "events_api") {
+    countCommits = (cat.commits || []).length;
+    countPrs = (cat.pull_requests || []).length;
+    countIssues = (cat.issues || []).length;
+    countComments = (cat.issue_comments || []).length;
+    countReviews = (cat.pr_reviews || []).length + (cat.pr_review_comments || []).length;
+    countOthers = (cat.branch_and_tag_creations || []).length + (cat.stars || []).length + (cat.forks || []).length;
+  } else {
+    countCommits = (cat.commits || []).length;
+    countPrs = (cat.prs_created || []).length;
+    countIssues = (cat.issues_created || []).length;
+    countReviews = (cat.prs_reviewed || []).length;
+    countComments = (cat.items_commented || []).length;
+    countOthers = 0;
+  }
 
   document.getElementById("stat-commits").textContent = countCommits;
   document.getElementById("stat-prs").textContent = countPrs;
   document.getElementById("stat-issues").textContent = countIssues;
   document.getElementById("stat-reviews").textContent = countReviews;
   document.getElementById("stat-comments").textContent = countComments;
+  document.getElementById("stat-others").textContent = countOthers;
 
-  const totalAll = countCommits + countPrs + countIssues + countReviews + countComments;
+  const totalAll = countCommits + countPrs + countIssues + countReviews + countComments + countOthers;
   document.getElementById("count-all").textContent = totalAll;
   document.getElementById("count-commits").textContent = countCommits;
   document.getElementById("count-prs").textContent = countPrs;
   document.getElementById("count-issues").textContent = countIssues;
-  document.getElementById("count-reviews").textContent = countReviews;
-  document.getElementById("count-comments").textContent = countComments;
+  document.getElementById("count-reviews").textContent = countReviews + countComments;
 
   markdownRaw.textContent = currentMarkdown;
 
@@ -402,85 +427,185 @@ function renderTimelineView() {
   const cat = currentActivityData.categorized || {};
   let items = [];
 
-  // 1. Commits
-  if (currentFilter === "all" || currentFilter === "commits") {
-    (cat.commits || []).forEach((c) => {
-      items.push({
-        type: "commit",
-        badge: "Commit",
-        badgeClass: "badge-commit",
-        repo: c.repo,
-        ref: "",
-        title: c.message,
-        url: c.url,
-        sha: c.sha,
-        time: formatTime(c.author_date)
-      });
-    });
-  }
+  const isEvents = currentActivityData.method === "events_api";
 
-  // 2. Pull Requests Tạo Mới
-  if (currentFilter === "all" || currentFilter === "prs") {
-    (cat.prs_created || []).forEach((pr) => {
-      items.push({
-        type: "pr",
-        badge: `PR [${pr.state}]`,
-        badgeClass: "badge-pr",
-        repo: pr.repo,
-        ref: "",
-        title: pr.title,
-        url: pr.url,
-        time: formatTime(pr.created_at)
+  if (isEvents) {
+    if (currentFilter === "all" || currentFilter === "commits") {
+      (cat.commits || []).forEach((c) => {
+        items.push({
+          type: "commit",
+          badge: "Commit",
+          badgeClass: "badge-commit",
+          repo: c.repo,
+          ref: c.branch,
+          title: c.message,
+          url: c.url,
+          sha: c.sha,
+          time: formatTime(c.created_at)
+        });
       });
-    });
-  }
+    }
 
-  // 3. Issues Tạo Mới
-  if (currentFilter === "all" || currentFilter === "issues") {
-    (cat.issues_created || []).forEach((iss) => {
-      items.push({
-        type: "issue",
-        badge: `Issue [${iss.state}]`,
-        badgeClass: "badge-issue",
-        repo: iss.repo,
-        ref: "",
-        title: iss.title,
-        url: iss.url,
-        time: formatTime(iss.created_at)
+    if (currentFilter === "all" || currentFilter === "prs") {
+      (cat.pull_requests || []).forEach((pr) => {
+        items.push({
+          type: "pr",
+          badge: `PR ${pr.action}`,
+          badgeClass: "badge-pr",
+          repo: pr.repo,
+          ref: `#${pr.number}`,
+          title: pr.title + (pr.merged ? " (Merged 🎉)" : ""),
+          url: pr.url,
+          time: formatTime(pr.created_at)
+        });
       });
-    });
-  }
+    }
 
-  // 4. PRs Đã Tham Gia Review
-  if (currentFilter === "all" || currentFilter === "reviews") {
-    (cat.prs_reviewed || []).forEach((r) => {
-      items.push({
-        type: "review",
-        badge: "PR Review",
-        badgeClass: "badge-review",
-        repo: r.repo,
-        ref: "",
-        title: r.title,
-        url: r.url,
-        time: formatTime(r.updated_at)
+    if (currentFilter === "all" || currentFilter === "issues") {
+      (cat.issues || []).forEach((iss) => {
+        items.push({
+          type: "issue",
+          badge: `Issue ${iss.action}`,
+          badgeClass: "badge-issue",
+          repo: iss.repo,
+          ref: `#${iss.number}`,
+          title: iss.title,
+          url: iss.url,
+          time: formatTime(iss.created_at)
+        });
       });
-    });
-  }
+    }
 
-  // 5. Issues/PRs Có Thảo Luận / Bình Luận
-  if (currentFilter === "all" || currentFilter === "comments") {
-    (cat.items_commented || []).forEach((cm) => {
-      items.push({
-        type: "comment",
-        badge: cm.type === "pull_request" ? "PR Comment" : "Issue Comment",
-        badgeClass: "badge-comment",
-        repo: cm.repo,
-        ref: "",
-        title: cm.title,
-        url: cm.url,
-        time: formatTime(cm.updated_at)
+    if (currentFilter === "all" || currentFilter === "reviews") {
+      (cat.pr_reviews || []).forEach((r) => {
+        items.push({
+          type: "review",
+          badge: "PR Review",
+          badgeClass: "badge-review",
+          repo: r.repo,
+          ref: `#${r.pr_number}`,
+          title: `Đã review PR [${r.state}]: ${r.pr_title}`,
+          url: r.url,
+          time: formatTime(r.created_at)
+        });
       });
-    });
+
+      (cat.pr_review_comments || []).forEach((rc) => {
+        items.push({
+          type: "review_comment",
+          badge: "Code Comment",
+          badgeClass: "badge-review",
+          repo: rc.repo,
+          ref: `#${rc.pr_number}`,
+          title: `Nhận xét code diff: "${rc.comment_body}..."`,
+          url: rc.url,
+          time: formatTime(rc.created_at)
+        });
+      });
+
+      (cat.issue_comments || []).forEach((ic) => {
+        items.push({
+          type: "comment",
+          badge: "Bình Luận",
+          badgeClass: "badge-comment",
+          repo: ic.repo,
+          ref: `#${ic.number}`,
+          title: `Bình luận trên ${ic.type}: "${ic.comment_body}..."`,
+          url: ic.url,
+          time: formatTime(ic.created_at)
+        });
+      });
+    }
+
+    if (currentFilter === "all") {
+      (cat.branch_and_tag_creations || []).forEach((b) => {
+        items.push({
+          type: "branch",
+          badge: `Tạo ${b.type}`,
+          badgeClass: "badge-branch",
+          repo: b.repo,
+          ref: b.ref,
+          title: `Đã tạo ${b.type} mới: ${b.ref}`,
+          url: `https://github.com/${b.repo}`,
+          time: formatTime(b.created_at)
+        });
+      });
+    }
+  } else {
+    // Search API Items
+    if (currentFilter === "all" || currentFilter === "commits") {
+      (cat.commits || []).forEach((c) => {
+        items.push({
+          type: "commit",
+          badge: "Commit",
+          badgeClass: "badge-commit",
+          repo: c.repo,
+          ref: "",
+          title: c.message,
+          url: c.url,
+          sha: c.sha,
+          time: formatTime(c.author_date)
+        });
+      });
+    }
+
+    if (currentFilter === "all" || currentFilter === "prs") {
+      (cat.prs_created || []).forEach((pr) => {
+        items.push({
+          type: "pr",
+          badge: `PR [${pr.state}]`,
+          badgeClass: "badge-pr",
+          repo: pr.repo,
+          ref: "",
+          title: pr.title,
+          url: pr.url,
+          time: formatTime(pr.created_at)
+        });
+      });
+    }
+
+    if (currentFilter === "all" || currentFilter === "issues") {
+      (cat.issues_created || []).forEach((iss) => {
+        items.push({
+          type: "issue",
+          badge: `Issue [${iss.state}]`,
+          badgeClass: "badge-issue",
+          repo: iss.repo,
+          ref: "",
+          title: iss.title,
+          url: iss.url,
+          time: formatTime(iss.created_at)
+        });
+      });
+    }
+
+    if (currentFilter === "all" || currentFilter === "reviews") {
+      (cat.prs_reviewed || []).forEach((r) => {
+        items.push({
+          type: "review",
+          badge: "PR Review",
+          badgeClass: "badge-review",
+          repo: r.repo,
+          ref: "",
+          title: r.title,
+          url: r.url,
+          time: formatTime(r.updated_at)
+        });
+      });
+
+      (cat.items_commented || []).forEach((cm) => {
+        items.push({
+          type: "comment",
+          badge: cm.type === "pull_request" ? "PR Comment" : "Issue Comment",
+          badgeClass: "badge-comment",
+          repo: cm.repo,
+          ref: "",
+          title: cm.title,
+          url: cm.url,
+          time: formatTime(cm.updated_at)
+        });
+      });
+    }
   }
 
   if (items.length === 0) {

@@ -448,29 +448,9 @@ body {
 
 .controls-grid {
   display: grid;
-  grid-template-columns: 2fr 2fr 1.2fr;
-  gap: 24px;
+  grid-template-columns: 2fr 1.5fr 1.8fr 1fr;
+  gap: 20px;
   align-items: flex-end;
-}
-
-.search-badge-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: rgba(99, 102, 241, 0.1);
-  border: 1px solid rgba(99, 102, 241, 0.25);
-  border-radius: var(--radius-md);
-  font-size: 0.82rem;
-  color: #c7d2fe;
-}
-
-.badge-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent-emerald);
-  box-shadow: 0 0 8px var(--accent-emerald);
 }
 
 .control-item label {
@@ -579,13 +559,9 @@ body {
    ========================================================= */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 16px;
   margin-bottom: 28px;
-}
-
-.stats-grid-5 {
-  grid-template-columns: repeat(5, 1fr);
 }
 
 .stat-card {

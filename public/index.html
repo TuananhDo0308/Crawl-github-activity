@@ -106,36 +106,50 @@
         <div class="controls-grid">
           
           <!-- Chọn ngày -->
-          <div class="control-item date-control-item">
-            <label for="input-date">Chọn Ngày Cần Tìm Kiếm (YYYY-MM-DD):</label>
+          <div class="control-item">
+            <label for="input-date">Chọn Ngày Cần Crawl:</label>
             <div class="date-input-wrap">
               <input type="date" id="input-date" class="input-field date-input" required>
               <div class="quick-dates">
                 <button type="button" class="chip-btn active" data-offset="0">Hôm nay</button>
                 <button type="button" class="chip-btn" data-offset="1">Hôm qua</button>
                 <button type="button" class="chip-btn" data-offset="2">2 ngày trước</button>
-                <button type="button" class="chip-btn" data-offset="7">1 tuần trước</button>
               </div>
             </div>
           </div>
 
-          <!-- Ghi chú về Search API -->
-          <div class="control-item info-control-item">
-            <label>API Đang Sử Dụng:</label>
-            <div class="search-badge-display">
-              <span class="badge-dot"></span>
-              <strong>GitHub REST Search API</strong> (/search/issues & /search/commits)
-            </div>
+          <!-- Múi giờ -->
+          <div class="control-item">
+            <label for="select-tz">Múi Giờ:</label>
+            <select id="select-tz" class="input-field">
+              <option value="7" selected>UTC+7 (Việt Nam / Bangkok / Jakarta)</option>
+              <option value="0">UTC+0 (UTC / London)</option>
+              <option value="8">UTC+8 (Singapore / Beijing / Tokyo-1)</option>
+              <option value="9">UTC+9 (Tokyo / Seoul)</option>
+              <option value="-5">UTC-5 (New York / EDT)</option>
+              <option value="-8">UTC-8 (San Francisco / PDT)</option>
+            </select>
+          </div>
+
+          <!-- Phương thức Crawler -->
+          <div class="control-item">
+            <label for="select-mode">Phương Thức Thu Thập:</label>
+            <select id="select-mode" class="input-field">
+              <option value="auto" selected>✨ Tự động (Khuyên dùng - tối ưu theo ngày)</option>
+              <option value="events">⚡ Activity Events API (Chi tiết nhất trong 30 ngày)</option>
+              <option value="search">🔍 REST Search API (Cho ngày trong quá khứ xa)</option>
+            </select>
           </div>
 
           <!-- Nút Submit -->
           <div class="control-item control-action">
             <button id="btn-crawl" class="btn btn-primary btn-lg btn-glow">
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
               </svg>
-              <span id="btn-crawl-text">Tìm Kiếm Hoạt Động</span>
+              <span id="btn-crawl-text">Thu Thập Dữ Liệu</span>
             </button>
           </div>
         </div>
@@ -144,7 +158,7 @@
       <!-- Loading State -->
       <div id="loading-spinner" class="loading-container hidden">
         <div class="spinner"></div>
-        <div class="loading-text">Đang tìm kiếm qua GitHub Search API...</div>
+        <div class="loading-text">Đang kết nối GitHub API và tổng hợp dữ liệu...</div>
       </div>
 
       <!-- Results Display -->
@@ -154,7 +168,7 @@
         <div class="results-header glass-panel">
           <div class="results-title-group">
             <h2 id="results-headline">Hoạt Động Ngày: 2026-10-06</h2>
-            <div id="results-meta-badge" class="meta-badge">GitHub REST Search API</div>
+            <div id="results-meta-badge" class="meta-badge">Phương thức: Events API</div>
           </div>
           <div class="results-actions">
             <button id="btn-copy-markdown" class="btn btn-secondary btn-sm" title="Sao chép báo cáo Markdown cho Daily Standup">
@@ -183,8 +197,8 @@
           </div>
         </div>
 
-        <!-- Stats Grid (5 Cards tương ứng 5 mục của Search API) -->
-        <div class="stats-grid stats-grid-5">
+        <!-- Stats Grid -->
+        <div class="stats-grid">
           <div class="stat-card glass-panel" data-type="commits">
             <div class="stat-icon stat-icon-commits">🔨</div>
             <div class="stat-content">
@@ -196,28 +210,35 @@
             <div class="stat-icon stat-icon-prs">🔀</div>
             <div class="stat-content">
               <div class="stat-value" id="stat-prs">0</div>
-              <div class="stat-label">PRs Tạo Mới</div>
+              <div class="stat-label">Pull Requests</div>
             </div>
           </div>
           <div class="stat-card glass-panel" data-type="issues">
             <div class="stat-icon stat-icon-issues">🐛</div>
             <div class="stat-content">
               <div class="stat-value" id="stat-issues">0</div>
-              <div class="stat-label">Issues Tạo Mới</div>
+              <div class="stat-label">Issues</div>
             </div>
           </div>
           <div class="stat-card glass-panel" data-type="reviews">
             <div class="stat-icon stat-icon-reviews">👀</div>
             <div class="stat-content">
               <div class="stat-value" id="stat-reviews">0</div>
-              <div class="stat-label">PRs Đã Review</div>
+              <div class="stat-label">PR Reviews</div>
             </div>
           </div>
           <div class="stat-card glass-panel" data-type="comments">
             <div class="stat-icon stat-icon-comments">💬</div>
             <div class="stat-content">
               <div class="stat-value" id="stat-comments">0</div>
-              <div class="stat-label">Thảo Luận</div>
+              <div class="stat-label">Bình luận</div>
+            </div>
+          </div>
+          <div class="stat-card glass-panel" data-type="others">
+            <div class="stat-icon stat-icon-others">🌿</div>
+            <div class="stat-content">
+              <div class="stat-value" id="stat-others">0</div>
+              <div class="stat-label">Nhánh / Sao</div>
             </div>
           </div>
         </div>
@@ -225,13 +246,12 @@
         <!-- Filter Tabs for Activities -->
         <div class="activity-tabs-wrap">
           <div class="activity-tabs">
-            <button class="activity-tab-btn active" data-filter="all">Tất Cả (<span id="count-all">0</span>)</button>
+            <button class="activity-tab-btn active" data-filter="all">Tất Cả Hoạt Động (<span id="count-all">0</span>)</button>
             <button class="activity-tab-btn" data-filter="commits">Commits (<span id="count-commits">0</span>)</button>
             <button class="activity-tab-btn" data-filter="prs">Pull Requests (<span id="count-prs">0</span>)</button>
             <button class="activity-tab-btn" data-filter="issues">Issues (<span id="count-issues">0</span>)</button>
-            <button class="activity-tab-btn" data-filter="reviews">PRs Review (<span id="count-reviews">0</span>)</button>
-            <button class="activity-tab-btn" data-filter="comments">Thảo Luận (<span id="count-comments">0</span>)</button>
-            <button class="activity-tab-btn" data-filter="markdown">Báo Cáo Markdown</button>
+            <button class="activity-tab-btn" data-filter="reviews">Reviews & Comments (<span id="count-reviews">0</span>)</button>
+            <button class="activity-tab-btn" data-filter="markdown">Xem Báo Cáo Markdown</button>
           </div>
         </div>
 
