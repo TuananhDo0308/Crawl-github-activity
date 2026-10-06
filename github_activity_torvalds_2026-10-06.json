@@ -1,0 +1,45 @@
+{
+  "method": "events_api",
+  "username": "torvalds",
+  "date": "2026-10-06",
+  "timezone_offset_hours": 7,
+  "total_events": 3,
+  "categorized": {
+    "commits": [
+      {
+        "repo": "torvalds/GuitarPedal",
+        "branch": "main",
+        "sha": "ab3b774",
+        "message": "Cache the last few schema replies in WebMIDI",
+        "url": "https://github.com/torvalds/GuitarPedal/commit/ab3b7743dcd2a8931c6ba79cbb11a643fcc57be8",
+        "created_at": "2026-10-05T22:45:46Z"
+      },
+      {
+        "repo": "torvalds/linux",
+        "branch": "master",
+        "sha": "2c3418f",
+        "message": "Merge tag 'keys-v7.3-rc7' of git://git.kernel.org/pub/scm/linux/kernel/git/jarkko/linux-tpmdd",
+        "url": "https://github.com/torvalds/linux/commit/2c3418fffa9d037b2038a6db48be63f9e2291806",
+        "created_at": "2026-10-06T03:04:27Z"
+      },
+      {
+        "repo": "torvalds/GuitarPedal",
+        "branch": "main",
+        "sha": "16bc75b",
+        "message": "Document and set up some external tool infrastructure",
+        "url": "https://github.com/torvalds/GuitarPedal/commit/16bc75b90d6da309386c2709ab00990a3d093beb",
+        "created_at": "2026-10-05T21:58:19Z"
+      }
+    ],
+    "pull_requests": [],
+    "issues": [],
+    "issue_comments": [],
+    "pr_reviews": [],
+    "pr_review_comments": [],
+    "branch_and_tag_creations": [],
+    "forks": [],
+    "stars": [],
+    "other": []
+  },
+  "raw_events_count": 100
+}
