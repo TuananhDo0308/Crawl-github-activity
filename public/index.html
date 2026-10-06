@@ -269,6 +269,31 @@
           <pre id="markdown-raw" class="code-block"></pre>
         </div>
 
+        <!-- API NETWORK MONITOR PANEL -->
+        <div id="monitor-section" class="monitor-section hidden">
+          <div class="monitor-header glass-panel">
+            <div class="monitor-title-row">
+              <h3 class="monitor-title">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                API Network Monitor
+              </h3>
+              <div class="monitor-summary">
+                <span class="monitor-badge" id="monitor-total-calls">0 calls</span>
+                <span class="monitor-badge monitor-badge-time" id="monitor-total-time">0ms</span>
+                <span class="monitor-badge monitor-badge-rate" id="monitor-rate-limit">Rate Limit: --</span>
+              </div>
+            </div>
+            <div class="monitor-actions">
+              <button id="btn-expand-monitor" type="button" class="btn btn-secondary btn-sm">Mở tất cả</button>
+              <button id="btn-collapse-monitor" type="button" class="btn btn-secondary btn-sm">Thu gọn</button>
+            </div>
+          </div>
+
+          <div id="monitor-calls-list" class="monitor-calls-list">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+
       </div>
 
     </section>
